@@ -6,7 +6,12 @@
 
     // .minimum_zig_version = "0.11.0",
 
-    .dependencies = .{},
+    .dependencies = .{
+        .runerip = .{
+            .url = "https://github.com/mnemnion/runerip/archive/refs/tags/v0.1.0.tar.gz",
+            .hash = "12204bc47494f43ee6e45556848aba5b947293315295cc572e95d346cfe96bfa6091",
+        },
+    },
 
     .paths = .{
         "build.zig",
@@ -14,5 +19,5 @@
         "src",
         "LICENSE",
         "README.md",
-    }
+    },
 }

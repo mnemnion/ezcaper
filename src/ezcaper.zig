@@ -46,12 +46,28 @@
 //! ```zig
 //! std.debug.print("a string: {} and a char {u}", .{escStringExact(str), escChar(c)});
 //! ```
+//!
+//! This module has `runerip` as a dependency, because the API makes handling both kinds of
+//! string print easier.  This dependency may be removed at some future point.
+//!
 
 const std = @import("std");
+
+const runerip = @import("runerip");
 
 /// Escape a Unicode scalar value for formatted printing.
 pub fn escChar(c: u21) EscChar {
     return .{ .c = c };
+}
+
+/// Escape a string, replacing invalid UTF-8 with U+FFFD.
+pub fn escStringLossy(str: []const u8) EscStringLossy {
+    .{ .str = str };
+}
+
+/// Escape a string, printing invalid bytes as \xXX.
+pub fn escStringExact(str: []const u8) EscStringExact {
+    .{ .str = str };
 }
 
 /// A struct for formatting `u21` characters.
@@ -66,7 +82,7 @@ pub const EscChar = struct {
     ) !void {
         if (fmt.len == 0) {
             try writer.writeByte('\'');
-        } else if (fmt[0] != 'u') {
+        } else if (fmt.len != 1 or fmt[0] != 'u') {
             std.debug.panic("Invalid format string \"{s}\" for EscChar", .{fmt});
         }
         if (isControl(char.c)) {
@@ -94,6 +110,125 @@ pub const EscChar = struct {
         }
     }
 };
+
+/// Escaped printer for strings.  Replaces invalid sequences with
+/// U+FFFD.
+pub const EscStringLossy = struct {
+    str: []const u8,
+
+    pub fn format(
+        sequence: EscStringLossy,
+        fmt: []const u8,
+        _: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        try stringEscaperLossy(fmt, sequence.str, writer);
+    }
+};
+
+pub const EscStringExact = struct {
+    str: []const u8,
+
+    pub fn format(
+        sequence: EscStringExact,
+        fmt: []const u8,
+        _: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        try stringEscaperExact(fmt, sequence.str, writer);
+    }
+};
+
+fn stringEscaperLossy(comptime fmt: []const u8, seq: []const u8, writer: anytype) !void {
+    if (fmt.len == 0) {
+        try writer.writeByte('"');
+    } else if (fmt.len != 1 or fmt[0] != 's') {
+        std.debug.panic("Invalid format string \"{s}\" for EscStringLossy", .{fmt});
+    }
+    var cursor: usize = 0;
+    var start: usize = 0;
+    while (cursor < seq.len) {
+        const this_cursor = cursor;
+        const cp = runerip.decodeRuneCursor(seq, &cursor) catch {
+            try writer.writeAll(seq[start..this_cursor]);
+            try writer.writeAll("\u{fffd}");
+            if (this_cursor != cursor) {
+                cursor += 1;
+            }
+            start = cursor;
+            continue;
+        };
+        if (isControl(cp)) {
+            try writer.writeAll(seq[start..this_cursor]);
+            start = cursor;
+            if (cp < 0x80) {
+                switch (cp) {
+                    '\t' => try writer.writeAll("\\t"),
+                    '\r' => try writer.writeAll("\\r"),
+                    '\n' => try writer.writeAll("\\n"),
+                    else => try writer.print("\\x{x:0>2}", .{cp}),
+                }
+            } else {
+                try writer.print("\\u{{{x}}}", .{cp});
+            }
+        } else if (fmt.len == 0 and (cp == '\\' or cp == '"')) {
+            try writer.writeAll(seq[start..this_cursor]);
+            start = cursor;
+            try writer.print("\\{u}", .{cp});
+        }
+    }
+    try writer.writeAll(seq[start..seq.len]);
+    if (fmt.len == 0) {
+        try writer.writeByte('"');
+    }
+}
+
+fn stringEscaperExact(comptime fmt: []const u8, seq: []const u8, writer: anytype) !void {
+    if (fmt.len == 0) {
+        try writer.writeByte('"');
+    } else if (fmt.len != 1 or fmt[0] != 's') {
+        std.debug.panic("Invalid format string \"{s}\" for EscStringLossy", .{fmt});
+    }
+    var cursor: usize = 0;
+    var start: usize = 0;
+    while (cursor < seq.len) {
+        const this_cursor = cursor;
+        const cp = runerip.decodeRuneCursor(seq, &cursor) catch {
+            try writer.writeAll(seq[start..this_cursor]);
+            try writer.writeAll("\u{fffd}");
+            if (this_cursor != cursor) {
+                cursor += 1;
+            }
+            for (this_cursor..cursor) |c| {
+                try writer.print("\\x{x:0>2}", .{c});
+            }
+            start = cursor;
+            continue;
+        };
+        if (isControl(cp)) {
+            try writer.writeAll(seq[start..this_cursor]);
+            start = cursor;
+            if (cp < 0x80) {
+                switch (cp) {
+                    '\t' => try writer.writeAll("\\t"),
+                    '\r' => try writer.writeAll("\\r"),
+                    '\n' => try writer.writeAll("\\n"),
+                    else => try writer.print("\\x{x:0>2}", .{cp}),
+                }
+            } else {
+                try writer.print("\\u{{{x}}}", .{cp});
+            }
+        } else if (fmt.len == 0 and (cp == '\\' or cp == '"')) {
+            try writer.writeAll(seq[start..this_cursor]);
+            start = cursor;
+            try writer.print("\\{u}", .{cp});
+        }
+    }
+    try writer.writeAll(seq[start..seq.len]);
+    if (fmt.len == 0) {
+        try writer.writeByte('"');
+    }
+}
 
 /// Enumeration of the relevant control categories.
 pub const ControlKind = enum {
