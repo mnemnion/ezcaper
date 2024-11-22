@@ -62,12 +62,12 @@ pub fn escChar(c: u21) EscChar {
 
 /// Escape a string, replacing invalid UTF-8 with U+FFFD.
 pub fn escStringLossy(str: []const u8) EscStringLossy {
-    .{ .str = str };
+    return .{ .str = str };
 }
 
 /// Escape a string, printing invalid bytes as \xXX.
 pub fn escStringExact(str: []const u8) EscStringExact {
-    .{ .str = str };
+    return .{ .str = str };
 }
 
 /// A struct for formatting `u21` characters.
@@ -139,7 +139,7 @@ pub const EscStringExact = struct {
     }
 };
 
-fn stringEscaperLossy(comptime fmt: []const u8, seq: []const u8, writer: anytype) !void {
+fn stringEscaperLossy(fmt: []const u8, seq: []const u8, writer: anytype) !void {
     if (fmt.len == 0) {
         try writer.writeByte('"');
     } else if (fmt.len != 1 or fmt[0] != 's') {
@@ -152,29 +152,34 @@ fn stringEscaperLossy(comptime fmt: []const u8, seq: []const u8, writer: anytype
         const cp = runerip.decodeRuneCursor(seq, &cursor) catch {
             try writer.writeAll(seq[start..this_cursor]);
             try writer.writeAll("\u{fffd}");
-            if (this_cursor != cursor) {
+            if (this_cursor == cursor) {
                 cursor += 1;
             }
             start = cursor;
             continue;
         };
-        if (isControl(cp)) {
-            try writer.writeAll(seq[start..this_cursor]);
-            start = cursor;
-            if (cp < 0x80) {
-                switch (cp) {
-                    '\t' => try writer.writeAll("\\t"),
-                    '\r' => try writer.writeAll("\\r"),
-                    '\n' => try writer.writeAll("\\n"),
-                    else => try writer.print("\\x{x:0>2}", .{cp}),
+        switch (whichControlKind(cp)) {
+            .control => {
+                try writer.writeAll(seq[start..this_cursor]);
+                start = cursor;
+                if (cp < 0x80) {
+                    switch (cp) {
+                        '\t' => try writer.writeAll("\\t"),
+                        '\r' => try writer.writeAll("\\r"),
+                        '\n' => try writer.writeAll("\\n"),
+                        else => try writer.print("\\x{x:0>2}", .{cp}),
+                    }
+                } else {
+                    try writer.print("\\u{{{x}}}", .{cp});
                 }
-            } else {
-                try writer.print("\\u{{{x}}}", .{cp});
-            }
-        } else if (fmt.len == 0 and (cp == '\\' or cp == '"')) {
-            try writer.writeAll(seq[start..this_cursor]);
-            start = cursor;
-            try writer.print("\\{u}", .{cp});
+            },
+            .format, .normal => {
+                if (fmt.len == 0 and (cp == '\\' or cp == '"')) {
+                    try writer.writeAll(seq[start..this_cursor]);
+                    start = cursor;
+                    try writer.print("\\{u}", .{cp});
+                }
+            },
         }
     }
     try writer.writeAll(seq[start..seq.len]);
@@ -183,7 +188,7 @@ fn stringEscaperLossy(comptime fmt: []const u8, seq: []const u8, writer: anytype
     }
 }
 
-fn stringEscaperExact(comptime fmt: []const u8, seq: []const u8, writer: anytype) !void {
+fn stringEscaperExact(fmt: []const u8, seq: []const u8, writer: anytype) !void {
     if (fmt.len == 0) {
         try writer.writeByte('"');
     } else if (fmt.len != 1 or fmt[0] != 's') {
@@ -195,33 +200,37 @@ fn stringEscaperExact(comptime fmt: []const u8, seq: []const u8, writer: anytype
         const this_cursor = cursor;
         const cp = runerip.decodeRuneCursor(seq, &cursor) catch {
             try writer.writeAll(seq[start..this_cursor]);
-            try writer.writeAll("\u{fffd}");
-            if (this_cursor != cursor) {
+            if (this_cursor == cursor) {
                 cursor += 1;
             }
             for (this_cursor..cursor) |c| {
-                try writer.print("\\x{x:0>2}", .{c});
+                try writer.print("\\x{x:0>2}", .{seq[c]});
             }
             start = cursor;
             continue;
         };
-        if (isControl(cp)) {
-            try writer.writeAll(seq[start..this_cursor]);
-            start = cursor;
-            if (cp < 0x80) {
-                switch (cp) {
-                    '\t' => try writer.writeAll("\\t"),
-                    '\r' => try writer.writeAll("\\r"),
-                    '\n' => try writer.writeAll("\\n"),
-                    else => try writer.print("\\x{x:0>2}", .{cp}),
+        switch (whichControlKind(cp)) {
+            .control => {
+                try writer.writeAll(seq[start..this_cursor]);
+                start = cursor;
+                if (cp < 0x80) {
+                    switch (cp) {
+                        '\t' => try writer.writeAll("\\t"),
+                        '\r' => try writer.writeAll("\\r"),
+                        '\n' => try writer.writeAll("\\n"),
+                        else => try writer.print("\\x{x:0>2}", .{cp}),
+                    }
+                } else {
+                    try writer.print("\\u{{{x}}}", .{cp});
                 }
-            } else {
-                try writer.print("\\u{{{x}}}", .{cp});
-            }
-        } else if (fmt.len == 0 and (cp == '\\' or cp == '"')) {
-            try writer.writeAll(seq[start..this_cursor]);
-            start = cursor;
-            try writer.print("\\{u}", .{cp});
+            },
+            .format, .normal => {
+                if (fmt.len == 0 and (cp == '\\' or cp == '"')) {
+                    try writer.writeAll(seq[start..this_cursor]);
+                    start = cursor;
+                    try writer.print("\\{u}", .{cp});
+                }
+            },
         }
     }
     try writer.writeAll(seq[start..seq.len]);
@@ -270,6 +279,38 @@ test escChar {
     out_array.shrinkRetainingCapacity(0);
     try writer.print("{u}", .{escChar('∅')});
     try expectEqualStrings("∅", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
+}
+
+test escStringLossy {
+    const allocator = std.testing.allocator;
+    var out_array = std.ArrayList(u8).init(allocator);
+    defer out_array.deinit();
+    var writer = out_array.writer();
+    try writer.print("{s}", .{escStringLossy("Farmer 👨🏻‍🌾 Bob")});
+    try expectEqualStrings("Farmer 👨🏻‍🌾 Bob", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
+    try writer.print("{s}", .{escStringLossy("bad \xc0 byte")});
+    try expectEqualStrings("bad \u{fffd} byte", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
+    try writer.print("{}", .{escStringLossy("\t\x05\u{81}")});
+    try expectEqualStrings("\"\\t\\x05\\u{81}\"", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
+}
+
+test escStringExact {
+    const allocator = std.testing.allocator;
+    var out_array = std.ArrayList(u8).init(allocator);
+    defer out_array.deinit();
+    var writer = out_array.writer();
+    try writer.print("{s}", .{escStringExact("Farmer 👨🏻‍🌾 Bob")});
+    try expectEqualStrings("Farmer 👨🏻‍🌾 Bob", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
+    try writer.print("{s}", .{escStringExact("bad \xc0 byte")});
+    try expectEqualStrings("bad \\xc0 byte", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
+    try writer.print("{}", .{escStringExact("Truncated \xf0\x9f\x98 😀")});
+    try expectEqualStrings("\"Truncated \\xf0\\x9f\\x98 😀\"", out_array.items);
     out_array.shrinkRetainingCapacity(0);
 }
 
