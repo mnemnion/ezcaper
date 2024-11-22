@@ -29,7 +29,7 @@ There are two structs for printing escaped strings: `EscStringExact` and `EscStr
 
 Both may be called with `{}` and `{s}`, with the same sort of outcome: `s` will print the string without quotes, while the bare option will print the string in double-quotes and escape a double quote as `\"` and a backslash as `\\`.  Both use the escape sequences `\t`, `\r`, and `\n`, print ASCII C0 codes as `\xXX`, and all other escaped values in the `\u{XXXX}` format.
 
-It is a bug if the string produced by `EscStringExact` does not read into Zig with a byte-identical result to the source string.  It is *not* a bug if zig fmt formats the result string differently from ezcaper.
+It is a bug if the string produced by `EscStringExact` does not read into Zig with a byte-identical result to the source string.  It is *not* a bug if `zig fmt` formats the result string differently from ezcaper.
 
 Note that `EscChar` will escape surrogate codepoints, which is not (currently) valid in Zig source code.  The string printers will replace or byte-print surrogates, respectively, and this will change if and when escaped surrogates become valid in Zig strings, see issue [#20270](https://github.com/ziglang/zig/issues/20270).
 
