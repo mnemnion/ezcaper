@@ -71,7 +71,12 @@ pub const EscChar = struct {
         }
         if (isControl(char.c)) {
             if (char.c < 0x80) {
-                try writer.print("\\x{x}", .{char.c});
+                switch (char.c) {
+                    '\n' => try writer.writeAll("\\n"),
+                    '\r' => try writer.writeAll("\\r"),
+                    '\t' => try writer.writeAll("\\t"),
+                    else => try writer.print("\\x{x:0>2}", .{char.c}),
+                }
             } else if (char.c <= 0x10ffff) {
                 try writer.print("\\u{{{x}}}", .{char.c});
             } else {
@@ -104,17 +109,51 @@ pub fn isControl(cp: u21) bool {
     };
 }
 
+//| Tests
+
+const expectEqualStrings = std.testing.expectEqualStrings;
+
+test escChar {
+    const allocator = std.testing.allocator;
+    var out_array = std.ArrayList(u8).init(allocator);
+    defer out_array.deinit();
+    var writer = out_array.writer();
+    try writer.print("{}", .{escChar('!')});
+    try expectEqualStrings("'!'", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
+    try writer.print("{u}", .{escChar('!')});
+    try expectEqualStrings("!", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
+    try writer.print("{}", .{escChar('\t')});
+    try expectEqualStrings("'\\t'", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
+    try writer.print("{}", .{escChar('\x05')});
+    try expectEqualStrings("'\\x05'", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
+    try writer.print("{}", .{escChar('\u{200d}')});
+    try expectEqualStrings("'\\u{200d}'", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
+    try writer.print("{u}", .{escChar('∅')});
+    try expectEqualStrings("∅", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
+}
+
+//| Generated Code, do not change.  Any bugs here need to be fixed in
+//| the script which creates it.
+
 /// Answer whether the codepoint is a C-series control,
 /// format, or a normal codepoint.
 pub fn whichControlKind(cp: u21) ControlKind {
     return switch (cp) {
         0x0000...0x007F => whichControlImpl0(cp),
         0x0080...0x00FF => whichControlImpl1(cp),
+        0x0100...0x01FF => whichControlImpl2(cp),
         0x0200...0x03FF => whichControlImpl4(cp),
         0x0400...0x07FF => whichControlImpl8(cp),
         0x0800...0x0FFF => whichControlImpl16(cp),
         0x1000...0x1FFF => whichControlImpl32(cp),
         0x2000...0x3FFF => whichControlImpl64(cp),
+        0x4000...0x7FFF => whichControlImpl128(cp),
         0x8000...0xFFFF => whichControlImpl256(cp),
         0x10000...0x1FFFF => whichControlImpl512(cp),
         0x20000...0x3FFFF => whichControlImpl1024(cp),
@@ -145,6 +184,11 @@ fn whichControlImpl1(cp: u21) ControlKind {
     // zig fmt: on
 }
 
+/// Implementation for control determination in range 0x0100...0x01FF
+fn whichControlImpl2(cp: u21) ControlKind {
+    _ = cp;
+    return .normal;
+}
 /// Implementation for control determination in range 0x0200...0x03FF
 fn whichControlImpl4(cp: u21) ControlKind {
     // zig fmt: off
@@ -253,6 +297,11 @@ fn whichControlImpl64(cp: u21) ControlKind {
     // zig fmt: on
 }
 
+/// Implementation for control determination in range 0x4000...0x7FFF
+fn whichControlImpl128(cp: u21) ControlKind {
+    _ = cp;
+    return .normal;
+}
 /// Implementation for control determination in range 0x8000...0xFFFF
 fn whichControlImpl256(cp: u21) ControlKind {
     // zig fmt: off
