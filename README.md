@@ -17,19 +17,21 @@ zig fetch --save https://github.com/mnemnion/ezcaper/archive/refs/tags/v0.1.0.ta
 ## Design
 
 
-The brains of the operation is the oddly-specific function whichControlKind, which answer with the enums `.control`, `.format`, and `.normal`.  This allows for strings and codepoints to have different behavior for format characters: escaped as codepoints and printed directly as strings.  This lets Farmer Bob "👨🏻‍🌾" print as a single grapheme, while the ZWJ in Farmer Bob, in isolation, becomes '\u{200d}'.
+The brains of the operation is the oddly-specific function `whichControlKind`, which answers with the enums `.control`, `.format`, and `.normal`.  This allows for strings and codepoints to have different behavior for format characters: escaped as codepoints and printed directly as strings.  This lets Farmer Bob "👨🏻‍🌾" print as a single grapheme, while the ZWJ in Farmer Bob, in isolation, becomes `'\u{200d}'`.
 
-The functions are code-generated from the Unicode Character Database data for version 17.0, and will be updated upon the occasion of subsequent versions of Unicode.  It uses a master switch to separate codepoints by power-of-two, this is likely somewhat less efficient than the lookup table employed by `zg`, with the compensating advantage that it's pure code with no allocations.
+There's also the simpler `isControl`, which converts `.control` and `.format` to `true` and `.normal` to `false`.  Both of these are public functions, on the off chance that one might find them independently useful.
 
-These are used to power a few structs, intended to be used in formatted printing. EscChar will print a single u21, using either `{}` or `{u}` as the format string. If it receives `u` it will print the character 'bare', otherwise it will surround it with a pair of quotes and write `'` as `\'`.  This will throw an error if the codepoint is too large.
+The functions are code-generated from the Unicode Character Database data for version 17.0, and will be updated upon the occasion of subsequent versions of Unicode.  It uses a master switch to separate codepoints by power-of-two, which generates superior object code to a single ginormous switch, but is likely somewhat less efficient than the lookup table employed by `zg`.  With the compensating advantage that it's pure code with no allocations.
 
-There are two structs for printing escaped strings: EscStringExact and EscStringLossy. EscStringExact will print `\x` codes for any invalid Unicode data, while EscStringLossy will print the Unicode Replacement Character U+FFFD for any invalid sequences, following the recommended approach to substitution in the Unicode Standard.
+These are used to power a few structs, intended to be used in formatted printing. `EscChar` will print a single u21, using either `{}` or `{u}` as the format string. If it receives `u` it will print the character 'bare', otherwise it will surround it with a pair of quotes and write `'` as `\'`.  This will throw an error if the codepoint is too large.
+
+There are two structs for printing escaped strings: `EscStringExact` and `EscStringLossy`. `EscStringExact` will print `\x` codes for any invalid Unicode data, while `EscStringLossy` will print the Unicode Replacement Character `U+FFFD` for any invalid sequences, following the recommended approach to substitution in the Unicode Standard.
 
 Both may be called with `{}` and `{s}`, with the same sort of outcome: `s` will print the string without quotes, while the bare option will print the string in double-quotes and escape a double quote as `\"` and a backslash as `\\`.  Both use the escape sequences `\t`, `\r`, and `\n`, print ASCII C0 codes as `\xXX`, and all other escaped values in the `\u{XXXX}` format.
 
-It is a bug if the string produced by EscStringExact does not read into Zig with a byte-identical result to the source string.  It is *not* a bug if zig fmt formats the result string differently from ezcaper.
+It is a bug if the string produced by `EscStringExact` does not read into Zig with a byte-identical result to the source string.  It is *not* a bug if zig fmt formats the result string differently from ezcaper.
 
-Note that EscChar will escape surrogate codepoints, which is not (currently) valid in Zig source code.  The string printers will replace or byte-print surrogates, respectively, and this will change if and when escaped surrogates become valid in Zig strings, see issue #20270.
+Note that `EscChar` will escape surrogate codepoints, which is not (currently) valid in Zig source code.  The string printers will replace or byte-print surrogates, respectively, and this will change if and when escaped surrogates become valid in Zig strings, see issue [#20270](https://github.com/ziglang/zig/issues/20270).
 
 For convenient formatting, these structs can be created with helper functions `escChar`, `escStringExact`, and `escStringLossy`.  Example use:
 
