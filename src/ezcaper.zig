@@ -83,7 +83,7 @@ pub const EscChar = struct {
         if (fmt.len == 0) {
             try writer.writeByte('\'');
         } else if (fmt.len != 1 or fmt[0] != 'u') {
-            std.debug.panic("Invalid format string \"{s}\" for EscChar", .{fmt});
+            std.debug.panic("Invalid format string {} for EscChar", .{escStringExact(fmt)});
         }
         if (isControl(char.c)) {
             if (char.c < 0x80) {
@@ -143,7 +143,7 @@ fn stringEscaperLossy(fmt: []const u8, seq: []const u8, writer: anytype) !void {
     if (fmt.len == 0) {
         try writer.writeByte('"');
     } else if (fmt.len != 1 or fmt[0] != 's') {
-        std.debug.panic("Invalid format string \"{s}\" for EscStringLossy", .{fmt});
+        std.debug.panic("Invalid format string {} for EscStringLossy", .{escStringExact(fmt)});
     }
     var cursor: usize = 0;
     var start: usize = 0;
@@ -192,7 +192,7 @@ fn stringEscaperExact(fmt: []const u8, seq: []const u8, writer: anytype) !void {
     if (fmt.len == 0) {
         try writer.writeByte('"');
     } else if (fmt.len != 1 or fmt[0] != 's') {
-        std.debug.panic("Invalid format string \"{s}\" for EscStringLossy", .{fmt});
+        std.debug.panic("Invalid format string {} for EscStringLossy", .{escStringExact(fmt)});
     }
     var cursor: usize = 0;
     var start: usize = 0;
@@ -296,6 +296,10 @@ test escStringLossy {
     try writer.print("{}", .{escStringLossy("\t\x05\u{81}")});
     try expectEqualStrings("\"\\t\\x05\\u{81}\"", out_array.items);
     out_array.shrinkRetainingCapacity(0);
+    // First three bytes of 😀 replaced with one \u{fffd}.
+    try writer.print("{}", .{escStringLossy("Replaced \xf0\x9f\x98 😀")});
+    try expectEqualStrings("\"Replaced \u{fffd} 😀\"", out_array.items);
+    out_array.shrinkRetainingCapacity(0);
 }
 
 test escStringExact {
@@ -309,6 +313,7 @@ test escStringExact {
     try writer.print("{s}", .{escStringExact("bad \xc0 byte")});
     try expectEqualStrings("bad \\xc0 byte", out_array.items);
     out_array.shrinkRetainingCapacity(0);
+    // First three bytes of 😀 printed.
     try writer.print("{}", .{escStringExact("Truncated \xf0\x9f\x98 😀")});
     try expectEqualStrings("\"Truncated \\xf0\\x9f\\x98 😀\"", out_array.items);
     out_array.shrinkRetainingCapacity(0);
