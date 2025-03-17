@@ -1,10 +1,12 @@
 // Zig package metadata for {project_name}
 .{
-    .name = "ezcaper",
+    .name = .ezcaper,
 
     .version = "0.0.1",
 
-    // .minimum_zig_version = "0.11.0",
+    .fingerprint = 0x4123e8c2897fdf91,
+
+    .minimum_zig_version = "0.14.0",
 
     .dependencies = .{
         .runerip = .{
