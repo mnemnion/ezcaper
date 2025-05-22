@@ -2,7 +2,7 @@
 .{
     .name = .ezcaper,
 
-    .version = "0.0.1",
+    .version = "0.2.2",
 
     .fingerprint = 0x4123e8c2897fdf91,
 
