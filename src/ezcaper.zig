@@ -76,7 +76,7 @@ pub const EscChar = struct {
 
     pub fn format(
         char: EscChar,
-        fmt: []const u8,
+        comptime fmt: []const u8,
         _: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
@@ -118,7 +118,7 @@ pub const EscStringLossy = struct {
 
     pub fn format(
         sequence: EscStringLossy,
-        fmt: []const u8,
+        comptime fmt: []const u8,
         _: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
@@ -131,7 +131,7 @@ pub const EscStringExact = struct {
 
     pub fn format(
         sequence: EscStringExact,
-        fmt: []const u8,
+        comptime fmt: []const u8,
         _: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
@@ -139,7 +139,11 @@ pub const EscStringExact = struct {
     }
 };
 
-fn stringEscaperLossy(fmt: []const u8, seq: []const u8, writer: anytype) !void {
+fn stringEscaperLossy(
+    comptime fmt: []const u8,
+    seq: []const u8,
+    writer: anytype,
+) !void {
     if (fmt.len == 0) {
         try writer.writeByte('"');
     } else if (fmt.len != 1 or fmt[0] != 's') {
@@ -188,7 +192,11 @@ fn stringEscaperLossy(fmt: []const u8, seq: []const u8, writer: anytype) !void {
     }
 }
 
-fn stringEscaperExact(fmt: []const u8, seq: []const u8, writer: anytype) !void {
+fn stringEscaperExact(
+    comptime fmt: []const u8,
+    seq: []const u8,
+    writer: anytype,
+) !void {
     if (fmt.len == 0) {
         try writer.writeByte('"');
     } else if (fmt.len != 1 or fmt[0] != 's') {
