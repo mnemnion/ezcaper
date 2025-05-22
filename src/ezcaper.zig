@@ -83,7 +83,8 @@ pub const EscChar = struct {
         if (fmt.len == 0) {
             try writer.writeByte('\'');
         } else if (fmt.len != 1 or fmt[0] != 'u') {
-            std.debug.panic("Invalid format string {} for EscChar", .{escStringExact(fmt)});
+            @compileLog(fmt);
+            @compileError("Invalid format string {} for EscChar");
         }
         if (isControl(char.c)) {
             if (char.c < 0x80) {
@@ -147,7 +148,8 @@ fn stringEscaperLossy(
     if (fmt.len == 0) {
         try writer.writeByte('"');
     } else if (fmt.len != 1 or fmt[0] != 's') {
-        std.debug.panic("Invalid format string {} for EscStringLossy", .{escStringExact(fmt)});
+        @compileLog(fmt);
+        @compileError("Invalid format string {} for EscStringLossy");
     }
     var cursor: usize = 0;
     var start: usize = 0;
@@ -200,7 +202,8 @@ fn stringEscaperExact(
     if (fmt.len == 0) {
         try writer.writeByte('"');
     } else if (fmt.len != 1 or fmt[0] != 's') {
-        std.debug.panic("Invalid format string {} for EscStringLossy", .{escStringExact(fmt)});
+        @compileLog(fmt);
+        @compileError("Invalid format string {} for EscStringExact");
     }
     var cursor: usize = 0;
     var start: usize = 0;

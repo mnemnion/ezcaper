@@ -21,7 +21,7 @@ The brains of the operation is the oddly-specific function `whichControlKind`, w
 
 There's also the simpler `isControl`, which converts `.control` and `.format` to `true` and `.normal` to `false`.  Both of these are public functions, on the off chance that one might find them independently useful.
 
-The functions are code-generated from the Unicode Character Database data for version 17.0, and will be updated upon the occasion of subsequent versions of Unicode.  It uses a master switch to separate codepoints by power-of-two, which generates superior object code to a single ginormous switch, but is likely somewhat less efficient than the lookup table employed by `zg`.  With the compensating advantage that it's pure code with no allocations.
+The functions are code-generated from the Unicode Character Database data for version 16.0, and will be updated upon the occasion of subsequent versions of Unicode.  It uses a master switch to separate codepoints by power-of-two, which generates superior object code to a single ginormous switch, but is likely somewhat less efficient than the lookup table employed by `zg`.  With the compensating advantage that it's pure code with no allocations.
 
 These are used to power a few structs, intended to be used in formatted printing. `EscChar` will print a single `u21`, using either `{}` or `{u}` as the format string. If it receives `u` it will print the character 'bare', otherwise it will surround it with a pair of quotes and write `'` as `\'`.  This will throw an error if the codepoint is too large.
 
