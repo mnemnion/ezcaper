@@ -56,7 +56,14 @@ const std = @import("std");
 const runerip = @import("runerip");
 
 /// Escape a Unicode scalar value for formatted printing.
+/// Equivalent of `"{u}"`.
 pub fn escChar(c: u21) EscChar {
+    return .{ .c = c };
+}
+
+/// Escape a Unicode scalar value as a single-quoted value.
+/// Similar to `"'\u'"`.
+pub fn escCharQuoted(c: u21) EscCharQuoted {
     return .{ .c = c };
 }
 
@@ -65,8 +72,17 @@ pub fn escStringLossy(str: []const u8) EscStringLossy {
     return .{ .str = str };
 }
 
-/// Escape a string, printing invalid bytes as \xXX.
+/// Escape a "double quoted" string, replacing invalid UTF-8 with U+FFFD.
+pub fn escStringLossyQuoted(str: []const u8) EscStringLossyQuoted {
+    return .{ .str = str };
+}
+/// Escape a string, printing invalid bytes as \xNN.
 pub fn escStringExact(str: []const u8) EscStringExact {
+    return .{ .str = str };
+}
+
+/// Escape a "double quoted" string, printing invalid bytes as \xNN.
+pub fn escStringExactQuoted(str: []const u8) EscStringExactQuoted {
     return .{ .str = str };
 }
 
@@ -74,82 +90,96 @@ pub fn escStringExact(str: []const u8) EscStringExact {
 pub const EscChar = struct {
     c: u21,
 
-    pub fn format(
-        char: EscChar,
-        comptime fmt: []const u8,
-        _: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        if (fmt.len == 0) {
-            try writer.writeByte('\'');
-        } else if (fmt.len != 1 or fmt[0] != 'u') {
-            @compileLog(fmt);
-            @compileError("Invalid format string {} for EscChar");
-        }
-        if (isControl(char.c)) {
-            if (char.c < 0x80) {
-                switch (char.c) {
-                    '\n' => try writer.writeAll("\\n"),
-                    '\r' => try writer.writeAll("\\r"),
-                    '\t' => try writer.writeAll("\\t"),
-                    else => try writer.print("\\x{x:0>2}", .{char.c}),
-                }
-            } else if (char.c <= 0x10ffff) {
-                try writer.print("\\u{{{x}}}", .{char.c});
-            } else {
-                return error.CodepointTooLarge;
-            }
-        } else {
-            if (fmt.len == 0 and char.c == '\'') {
-                try writer.writeAll("\'");
-            } else {
-                try writer.print("{u}", .{char.c});
-            }
-        }
-        if (fmt.len == 0) {
-            try writer.writeByte('\'');
-        }
+    pub fn format(char: EscChar, writer: anytype) !void {
+        try formatChar(char.c, writer, false);
     }
 };
+
+// A struct for formatting quoted `u21` characters.
+pub const EscCharQuoted = struct {
+    c: u21,
+
+    pub fn format(char: EscCharQuoted, writer: anytype) !void {
+        try formatChar(char.c, writer, true);
+    }
+};
+
+fn formatChar(c: u21, writer: anytype, comptime quoted: bool) !void {
+    if (quoted) {
+        try writer.writeByte('\'');
+    }
+    if (isControl(c)) {
+        if (c < 0x80) {
+            switch (c) {
+                '\n' => try writer.writeAll("\\n"),
+                '\r' => try writer.writeAll("\\r"),
+                '\t' => try writer.writeAll("\\t"),
+                else => try writer.print("\\x{x:0>2}", .{c}),
+            }
+        } else if (c <= 0x10ffff) {
+            try writer.print("\\u{{{x}}}", .{c});
+        } else {
+            return error.WriteFailed;
+        }
+    } else {
+        if (quoted and c == '\'') {
+            try writer.writeAll("\'");
+        } else {
+            try writer.print("{u}", .{c});
+        }
+    }
+    if (quoted) {
+        try writer.writeByte('\'');
+    }
+}
 
 /// Escaped printer for strings.  Replaces invalid sequences with
 /// U+FFFD.
 pub const EscStringLossy = struct {
     str: []const u8,
 
-    pub fn format(
-        sequence: EscStringLossy,
-        comptime fmt: []const u8,
-        _: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try stringEscaperLossy(fmt, sequence.str, writer);
+    pub fn format(sequence: EscStringLossy, writer: anytype) !void {
+        try stringEscaperLossy(sequence.str, writer, false);
     }
 };
 
+/// Printer for "double quoted" strings.  Replaces invalid sequences
+/// with U+FFFD.
+pub const EscStringLossyQuoted = struct {
+    str: []const u8,
+
+    pub fn format(sequence: EscStringLossyQuoted, writer: anytype) !void {
+        try stringEscaperLossy(sequence.str, writer, true);
+    }
+};
+
+/// Escaped printer for strings.  Replaces invalid bytes with their
+/// `\xNN` equivalent.
 pub const EscStringExact = struct {
     str: []const u8,
 
-    pub fn format(
-        sequence: EscStringExact,
-        comptime fmt: []const u8,
-        _: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try stringEscaperExact(fmt, sequence.str, writer);
+    pub fn format(sequence: EscStringExact, writer: anytype) !void {
+        try stringEscaperExact(sequence.str, writer, false);
+    }
+};
+
+/// Printer for "double quoted" strings.  Replaces invalid bytes with
+/// their `\xNN` equivalent.
+pub const EscStringExactQuoted = struct {
+    str: []const u8,
+
+    pub fn format(sequence: EscStringExactQuoted, writer: anytype) !void {
+        try stringEscaperExact(sequence.str, writer, true);
     }
 };
 
 fn stringEscaperLossy(
-    comptime fmt: []const u8,
     seq: []const u8,
     writer: anytype,
+    comptime quoted: bool,
 ) !void {
-    if (fmt.len == 0) {
+    if (quoted) {
         try writer.writeByte('"');
-    } else if (fmt.len != 1 or fmt[0] != 's') {
-        @compileLog(fmt);
-        @compileError("Invalid format string {} for EscStringLossy");
     }
     var cursor: usize = 0;
     var start: usize = 0;
@@ -180,7 +210,7 @@ fn stringEscaperLossy(
                 }
             },
             .format, .normal => {
-                if (fmt.len == 0 and (cp == '\\' or cp == '"')) {
+                if (quoted and (cp == '\\' or cp == '"')) {
                     try writer.writeAll(seq[start..this_cursor]);
                     start = cursor;
                     try writer.print("\\{u}", .{cp});
@@ -189,21 +219,18 @@ fn stringEscaperLossy(
         }
     }
     try writer.writeAll(seq[start..seq.len]);
-    if (fmt.len == 0) {
+    if (quoted) {
         try writer.writeByte('"');
     }
 }
 
 fn stringEscaperExact(
-    comptime fmt: []const u8,
     seq: []const u8,
     writer: anytype,
+    comptime quoted: bool,
 ) !void {
-    if (fmt.len == 0) {
+    if (quoted) {
         try writer.writeByte('"');
-    } else if (fmt.len != 1 or fmt[0] != 's') {
-        @compileLog(fmt);
-        @compileError("Invalid format string {} for EscStringExact");
     }
     var cursor: usize = 0;
     var start: usize = 0;
@@ -236,7 +263,7 @@ fn stringEscaperExact(
                 }
             },
             .format, .normal => {
-                if (fmt.len == 0 and (cp == '\\' or cp == '"')) {
+                if (quoted and (cp == '\\' or cp == '"')) {
                     try writer.writeAll(seq[start..this_cursor]);
                     start = cursor;
                     try writer.print("\\{u}", .{cp});
@@ -245,7 +272,7 @@ fn stringEscaperExact(
         }
     }
     try writer.writeAll(seq[start..seq.len]);
-    if (fmt.len == 0) {
+    if (quoted) {
         try writer.writeByte('"');
     }
 }
@@ -270,62 +297,62 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 
 test escChar {
     const allocator = std.testing.allocator;
-    var out_array = std.ArrayList(u8).init(allocator);
-    defer out_array.deinit();
-    var writer = out_array.writer();
-    try writer.print("{}", .{escChar('!')});
+    var out_array: std.ArrayList(u8) = .empty;
+    defer out_array.deinit(allocator);
+    var writer = out_array.writer(allocator);
+    try writer.print("{f}", .{escCharQuoted('!')});
     try expectEqualStrings("'!'", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{u}", .{escChar('!')});
+    try writer.print("{f}", .{escChar('!')});
     try expectEqualStrings("!", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{}", .{escChar('\t')});
+    try writer.print("{f}", .{escCharQuoted('\t')});
     try expectEqualStrings("'\\t'", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{}", .{escChar('\x05')});
+    try writer.print("{f}", .{escCharQuoted('\x05')});
     try expectEqualStrings("'\\x05'", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{}", .{escChar('\u{200d}')});
+    try writer.print("{f}", .{escCharQuoted('\u{200d}')});
     try expectEqualStrings("'\\u{200d}'", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{u}", .{escChar('∅')});
+    try writer.print("{f}", .{escChar('∅')});
     try expectEqualStrings("∅", out_array.items);
     out_array.shrinkRetainingCapacity(0);
 }
 
 test escStringLossy {
     const allocator = std.testing.allocator;
-    var out_array = std.ArrayList(u8).init(allocator);
-    defer out_array.deinit();
-    var writer = out_array.writer();
-    try writer.print("{s}", .{escStringLossy("Farmer 👨🏻‍🌾 Bob")});
+    var out_array: std.ArrayList(u8) = .empty;
+    defer out_array.deinit(allocator);
+    var writer = out_array.writer(allocator);
+    try writer.print("{f}", .{escStringLossy("Farmer 👨🏻‍🌾 Bob")});
     try expectEqualStrings("Farmer 👨🏻‍🌾 Bob", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{s}", .{escStringLossy("bad \xc0 byte")});
+    try writer.print("{f}", .{escStringLossy("bad \xc0 byte")});
     try expectEqualStrings("bad \u{fffd} byte", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{}", .{escStringLossy("\t\x05\u{81}")});
+    try writer.print("{f}", .{escStringLossyQuoted("\t\x05\u{81}")});
     try expectEqualStrings("\"\\t\\x05\\u{81}\"", out_array.items);
     out_array.shrinkRetainingCapacity(0);
     // First three bytes of 😀 replaced with one \u{fffd}.
-    try writer.print("{}", .{escStringLossy("Replaced \xf0\x9f\x98 😀")});
+    try writer.print("{f}", .{escStringLossyQuoted("Replaced \xf0\x9f\x98 😀")});
     try expectEqualStrings("\"Replaced \u{fffd} 😀\"", out_array.items);
     out_array.shrinkRetainingCapacity(0);
 }
 
 test escStringExact {
     const allocator = std.testing.allocator;
-    var out_array = std.ArrayList(u8).init(allocator);
-    defer out_array.deinit();
-    var writer = out_array.writer();
-    try writer.print("{s}", .{escStringExact("Farmer 👨🏻‍🌾 Bob")});
+    var out_array: std.ArrayList(u8) = .empty;
+    defer out_array.deinit(allocator);
+    var writer = out_array.writer(allocator);
+    try writer.print("{f}", .{escStringExact("Farmer 👨🏻‍🌾 Bob")});
     try expectEqualStrings("Farmer 👨🏻‍🌾 Bob", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{s}", .{escStringExact("bad \xc0 byte")});
+    try writer.print("{f}", .{escStringExact("bad \xc0 byte")});
     try expectEqualStrings("bad \\xc0 byte", out_array.items);
     out_array.shrinkRetainingCapacity(0);
     // First three bytes of 😀 printed.
-    try writer.print("{}", .{escStringExact("Truncated \xf0\x9f\x98 😀")});
+    try writer.print("{f}", .{escStringExactQuoted("Truncated \xf0\x9f\x98 😀")});
     try expectEqualStrings("\"Truncated \\xf0\\x9f\\x98 😀\"", out_array.items);
     out_array.shrinkRetainingCapacity(0);
 }

@@ -19,9 +19,7 @@ pub fn build(b: *std.Build) void {
     ) orelse &[0][]const u8{};
 
     const module_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/ezcaper.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = ezcaper_module,
         .filters = test_filters,
     });
 
@@ -39,18 +37,14 @@ pub fn build(b: *std.Build) void {
         module_unit_tests.root_module.addImport("runerip", runerip_dep.module("runerip"));
     }
 
-    const addOutputDirectoryArg = comptime if (@import("builtin").zig_version.order(.{ .major = 0, .minor = 13, .patch = 0 }) == .lt)
-        std.Build.Step.Run.addOutputFileArg
-    else
-        std.Build.Step.Run.addOutputDirectoryArg;
-
     const run_kcov = b.addSystemCommand(&.{
         "kcov",
         "--clean",
         "--exclude-line=unreachable,expect(false)",
     });
+
     run_kcov.addPrefixedDirectoryArg("--include-pattern=", b.path("."));
-    const coverage_output = addOutputDirectoryArg(run_kcov, ".");
+    const coverage_output = run_kcov.addOutputDirectoryArg(".");
     run_kcov.addArtifactArg(module_unit_tests);
 
     run_kcov.enableTestRunnerMode();
