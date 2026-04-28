@@ -299,23 +299,22 @@ test escChar {
     const allocator = std.testing.allocator;
     var out_array: std.ArrayList(u8) = .empty;
     defer out_array.deinit(allocator);
-    var writer = out_array.writer(allocator);
-    try writer.print("{f}", .{escCharQuoted('!')});
+    try out_array.print(allocator, "{f}", .{escCharQuoted('!')});
     try expectEqualStrings("'!'", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{f}", .{escChar('!')});
+    try out_array.print(allocator, "{f}", .{escChar('!')});
     try expectEqualStrings("!", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{f}", .{escCharQuoted('\t')});
+    try out_array.print(allocator, "{f}", .{escCharQuoted('\t')});
     try expectEqualStrings("'\\t'", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{f}", .{escCharQuoted('\x05')});
+    try out_array.print(allocator, "{f}", .{escCharQuoted('\x05')});
     try expectEqualStrings("'\\x05'", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{f}", .{escCharQuoted('\u{200d}')});
+    try out_array.print(allocator, "{f}", .{escCharQuoted('\u{200d}')});
     try expectEqualStrings("'\\u{200d}'", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{f}", .{escChar('∅')});
+    try out_array.print(allocator, "{f}", .{escChar('∅')});
     try expectEqualStrings("∅", out_array.items);
     out_array.shrinkRetainingCapacity(0);
 }
@@ -324,18 +323,17 @@ test escStringLossy {
     const allocator = std.testing.allocator;
     var out_array: std.ArrayList(u8) = .empty;
     defer out_array.deinit(allocator);
-    var writer = out_array.writer(allocator);
-    try writer.print("{f}", .{escStringLossy("Farmer 👨🏻‍🌾 Bob")});
+    try out_array.print(allocator, "{f}", .{escStringLossy("Farmer 👨🏻‍🌾 Bob")});
     try expectEqualStrings("Farmer 👨🏻‍🌾 Bob", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{f}", .{escStringLossy("bad \xc0 byte")});
+    try out_array.print(allocator, "{f}", .{escStringLossy("bad \xc0 byte")});
     try expectEqualStrings("bad \u{fffd} byte", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{f}", .{escStringLossyQuoted("\t\x05\u{81}")});
+    try out_array.print(allocator, "{f}", .{escStringLossyQuoted("\t\x05\u{81}")});
     try expectEqualStrings("\"\\t\\x05\\u{81}\"", out_array.items);
     out_array.shrinkRetainingCapacity(0);
     // First three bytes of 😀 replaced with one \u{fffd}.
-    try writer.print("{f}", .{escStringLossyQuoted("Replaced \xf0\x9f\x98 😀")});
+    try out_array.print(allocator, "{f}", .{escStringLossyQuoted("Replaced \xf0\x9f\x98 😀")});
     try expectEqualStrings("\"Replaced \u{fffd} 😀\"", out_array.items);
     out_array.shrinkRetainingCapacity(0);
 }
@@ -344,15 +342,14 @@ test escStringExact {
     const allocator = std.testing.allocator;
     var out_array: std.ArrayList(u8) = .empty;
     defer out_array.deinit(allocator);
-    var writer = out_array.writer(allocator);
-    try writer.print("{f}", .{escStringExact("Farmer 👨🏻‍🌾 Bob")});
+    try out_array.print(allocator, "{f}", .{escStringExact("Farmer 👨🏻‍🌾 Bob")});
     try expectEqualStrings("Farmer 👨🏻‍🌾 Bob", out_array.items);
     out_array.shrinkRetainingCapacity(0);
-    try writer.print("{f}", .{escStringExact("bad \xc0 byte")});
+    try out_array.print(allocator, "{f}", .{escStringExact("bad \xc0 byte")});
     try expectEqualStrings("bad \\xc0 byte", out_array.items);
     out_array.shrinkRetainingCapacity(0);
     // First three bytes of 😀 printed.
-    try writer.print("{f}", .{escStringExactQuoted("Truncated \xf0\x9f\x98 😀")});
+    try out_array.print(allocator, "{f}", .{escStringExactQuoted("Truncated \xf0\x9f\x98 😀")});
     try expectEqualStrings("\"Truncated \\xf0\\x9f\\x98 😀\"", out_array.items);
     out_array.shrinkRetainingCapacity(0);
 }

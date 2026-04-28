@@ -2,11 +2,11 @@
 .{
     .name = .ezcaper,
 
-    .version = "0.3.0",
+    .version = "0.3.1",
 
     .fingerprint = 0x4123e8c2897fdf91,
 
-    .minimum_zig_version = "0.15.1",
+    .minimum_zig_version = "0.16.0",
 
     .dependencies = .{
         .runerip = .{
