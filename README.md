@@ -11,7 +11,7 @@ The `ezcaper` library has several functions which serve to print strings, and co
 ## Install
 
 ```sh
-zig fetch --save https://github.com/mnemnion/ezcaper/archive/refs/tags/v0.3.0.tar.gz
+zig fetch --save https://github.com/mnemnion/ezcaper/archive/refs/tags/v0.3.2.tar.gz
 ```
 
 ## Design

@@ -47,13 +47,13 @@
 //! std.debug.print("a string: {} and a char {u}", .{escStringExact(str), escChar(c)});
 //! ```
 //!
-//! This module has `runerip` as a dependency, because the API makes handling both kinds of
+//! This module has `unicoder` as a dependency, because the API makes handling both kinds of
 //! string print easier.  This dependency may be removed at some future point.
 //!
 
 const std = @import("std");
 
-const runerip = @import("runerip");
+const unicoder = @import("unicoder");
 
 /// Escape a Unicode scalar value for formatted printing.
 /// Equivalent of `"{u}"`.
@@ -185,7 +185,7 @@ fn stringEscaperLossy(
     var start: usize = 0;
     while (cursor < seq.len) {
         const this_cursor = cursor;
-        const cp = runerip.decodeRuneCursor(seq, &cursor) catch {
+        const cp = unicoder.utf8.decodeCursor(seq, &cursor) catch {
             try writer.writeAll(seq[start..this_cursor]);
             try writer.writeAll("\u{fffd}");
             if (this_cursor == cursor) {
@@ -236,7 +236,7 @@ fn stringEscaperExact(
     var start: usize = 0;
     while (cursor < seq.len) {
         const this_cursor = cursor;
-        const cp = runerip.decodeRuneCursor(seq, &cursor) catch {
+        const cp = unicoder.utf8.decodeCursor(seq, &cursor) catch {
             try writer.writeAll(seq[start..this_cursor]);
             if (this_cursor == cursor) {
                 cursor += 1;

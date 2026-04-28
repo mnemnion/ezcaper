@@ -29,12 +29,12 @@ pub fn build(b: *std.Build) void {
 
     test_step.dependOn(&run_module_unit_tests.step);
 
-    if (b.lazyDependency("runerip", .{
+    if (b.lazyDependency("unicoder", .{
         .target = target,
         .optimize = optimize,
-    })) |runerip_dep| {
-        ezcaper_module.addImport("runerip", runerip_dep.module("runerip"));
-        module_unit_tests.root_module.addImport("runerip", runerip_dep.module("runerip"));
+    })) |unicoder_dep| {
+        ezcaper_module.addImport("unicoder", unicoder_dep.module("unicoder"));
+        module_unit_tests.root_module.addImport("unicoder", unicoder_dep.module("unicoder"));
     }
 
     const run_kcov = b.addSystemCommand(&.{
