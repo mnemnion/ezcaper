@@ -6,12 +6,12 @@
 
     .fingerprint = 0x4123e8c2897fdf91,
 
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.1",
 
     .dependencies = .{
         .unicoder = .{
-            .url = "https://github.com/mnemnion/unicoder/archive/refs/tags/v0.1.0.tar.gz",
-            .hash = "unicoder-0.1.0-f6uOBXhTAgBMIbLye6ovm2FTayJSvGjwoHL5gpOTGhQT",
+            .url = "https://github.com/mnemnion/unicoder/archive/refs/tags/v0.2.1.tar.gz",
+            .hash = "unicoder-0.2.1-f6uOBX5uAgBvJqB0XGpW0_o_J5k27H-P7v65hsUDO1P8",
         },
     },
 
